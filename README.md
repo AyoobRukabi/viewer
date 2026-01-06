@@ -1,7 +1,7 @@
 ## Cars Viewer
 
 ## Folder structure
-
+```text
 Viewer/
 ├── cmd/
 │   ├── server/         # This will hold our main.go file. It will be the entry point wher the application starts
@@ -13,3 +13,5 @@ Viewer/
 ├── web/                
 |   ├── templates/      # This is for HTML files
 │   └── service/        # This is for CSS and JavaScript files
+
+```
