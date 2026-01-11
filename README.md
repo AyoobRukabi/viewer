@@ -45,7 +45,7 @@ cars-viewer/
 
 1. **Navigate to the project directory**:
    ```bash
-   cd cars-viewer
+   cd viewer
    ```
 
 2. **Run the Go server**:
