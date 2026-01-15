@@ -12,12 +12,13 @@ type Specification struct {
 type Car struct {
 	ID				int				`json:"id"`
 	Name			string			`json:"name"`
-	ManufacturerID	string			`json:"manufacturerId"`
-	CategoryID		string			`json:"categoryId"`
-	Year			string			`json:"year"`
+	ManufacturerID	int				`json:"manufacturerId"`
+	CategoryID		int				`json:"categoryId"`
+	Year			int				`json:"year"`
 	Specs			Specification	`json:"Specifications"`
 	Price			string			`json:"price"`
 	Availability	bool			`json:"availability"`
+	Image			string			`json:"image"`
 }
 
 // Manufacturer matches the "manufacturers" array in our API

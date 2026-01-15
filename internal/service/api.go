@@ -6,17 +6,21 @@ import (
 	"net/http"
 	"time"
 	"viewer/internal/models"
+	"log"
 )
 
 // API url
 
-const apiUrl = "http://localhost:3000"
+const apiUrl = "http://localhost:3000/api"
 
 // FetchCars gets the list of all cars models
 func FetchCars() ([]models.Car, error) {
 
 	// the specific url
 	url := fmt.Sprintf("%s/models", apiUrl)
+
+	//DEBUG: This will print the URL to our terminal
+	log.Println("DEBUG: Requesting URL ->",url)
 
 	// Creating a Client with a timeout so our app doesn't freeze
 	client := http.Client{

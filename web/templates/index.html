@@ -16,7 +16,7 @@
             <div class="container">
                 {{ range . }}
                 <div class="car-card">
-                    <img src="http://localhost:3000/api/images/{{. Image }}" alt="{{. Name }}">
+                    <img src="http://localhost:3000/api/images/{{ .Image }}" alt="{{ .Name }}">
                 <div class="car-details">
                     <h2>{{ .Name}}</h2>
                     <p class="price">Year: {{ .Year }}</p>
