@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"viewer/internal/handlers"
 )
-
+//test
 func main() {
 	// Serve Static Files (CSS, JS)
 	// This tells GO: if a URL starts with /static/, look inside the web/static folder"
