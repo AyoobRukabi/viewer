@@ -1,0 +1,14 @@
+# Ignore Mac system files
+.DS_Store
+
+# Ignore Node.js dependencies (CRITICAL)
+api/node_modules/
+node_modules/
+
+# Ignore Go build binaries (The executable files)
+main
+server
+*.exe
+
+# Ignore environment variables (Security risk)
+.env

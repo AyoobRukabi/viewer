@@ -1,339 +1,247 @@
-// ===========================
-// Configuration & Constants
-// ===========================
-const API_BASE_URL = 'http://localhost:8080/api';
+// GLOBAL VARIABLES
+let allCars = [];
+let manufacturers = [];
+let categories = []; // NEW: Store categories here
+let compareList = new Set(); 
 
-// DOM Elements
-const elements = {
-    loading: document.getElementById('loading'),
-    errorMessage: document.getElementById('error-message'),
-    errorText: document.getElementById('error-text'),
-    carsSection: document.getElementById('cars-section'),
-    manufacturersSection: document.getElementById('manufacturers-section'),
-    carsGrid: document.getElementById('cars-grid'),
-    manufacturersGrid: document.getElementById('manufacturers-grid'),
-    modal: document.getElementById('car-modal'),
-    navButtons: document.querySelectorAll('.nav-btn')
-};
+document.addEventListener("DOMContentLoaded", () => {
+    fetchManufacturers();
+    fetchCategories(); // NEW: Fetch them on load
+    fetchCars();
 
-// ===========================
-// State Management
-// ===========================
-let currentView = 'cars';
-let carsData = [];
-let manufacturersData = [];
+    // Event Listeners
+    document.getElementById('searchInput').addEventListener('input', filterCars);
+    document.getElementById('manufacturerSelect').addEventListener('change', filterCars);
+    document.getElementById('resetFilters').addEventListener('click', resetFilters);
 
-// ===========================
-// API Functions
-// ===========================
+    // Modal Close
+    document.querySelector('.close-btn').addEventListener('click', () => {
+        document.getElementById('carModal').style.display = 'none';
+    });
+    window.addEventListener('click', (e) => {
+        if (e.target == document.getElementById('carModal')) {
+            document.getElementById('carModal').style.display = 'none';
+        }
+        if (e.target == document.getElementById('compareModal')) {
+            closeCompareModal();
+        }
+    });
+});
 
-/**
- * Fetch all cars from the backend
- */
+// --- API FETCHING ---
 async function fetchCars() {
     try {
-        showLoading(true);
-        hideError();
-
-        const response = await fetch(`${API_BASE_URL}/cars`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        carsData = data;
-        renderCars(data);
-        
-        showLoading(false);
+        const response = await fetch('/api/cars');
+        allCars = await response.json();
+        renderCars(allCars);
     } catch (error) {
-        console.error('Error fetching cars:', error);
-        showError('Failed to load cars. Please check if the backend server is running.');
-        showLoading(false);
+        console.error("Error loading cars", error);
     }
 }
 
-/**
- * Fetch specific car details by ID
- * This demonstrates the asynchronous goroutine/channel processing on the backend
- */
-async function fetchCarDetails(carId) {
-    try {
-        showLoading(true);
-        
-        const response = await fetch(`${API_BASE_URL}/cars/${carId}`);
-        
-        if (!response.ok) {
-            if (response.status === 404) {
-                throw new Error('Car not found');
-            }
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const carData = await response.json();
-        
-        showLoading(false);
-        return carData;
-    } catch (error) {
-        console.error('Error fetching car details:', error);
-        showError(`Failed to load car details: ${error.message}`);
-        showLoading(false);
-        throw error;
-    }
-}
-
-/**
- * Fetch all manufacturers from the backend
- */
 async function fetchManufacturers() {
     try {
-        showLoading(true);
-        hideError();
-
-        const response = await fetch(`${API_BASE_URL}/manufacturers`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        manufacturersData = data;
-        renderManufacturers(data);
-        
-        showLoading(false);
-    } catch (error) {
-        console.error('Error fetching manufacturers:', error);
-        showError('Failed to load manufacturers. Please check if the backend server is running.');
-        showLoading(false);
-    }
+        const response = await fetch('/api/manufacturers');
+        manufacturers = await response.json();
+        const select = document.getElementById('manufacturerSelect');
+        select.innerHTML = '<option value="">All Manufacturers</option>';
+        manufacturers.forEach(m => {
+            const option = document.createElement('option');
+            option.value = m.id;
+            option.textContent = m.name;
+            select.appendChild(option);
+        });
+    } catch (error) { console.error("Error loading manufacturers", error); }
 }
 
-// ===========================
-// Render Functions
-// ===========================
+// NEW: Fetch Categories Function
+async function fetchCategories() {
+    try {
+        const response = await fetch('/api/categories');
+        categories = await response.json();
+    } catch (error) { console.error("Error loading categories", error); }
+}
 
-/**
- * Render cars grid
- */
-function renderCars(cars) {
-    if (!cars || cars.length === 0) {
-        elements.carsGrid.innerHTML = '<p style="text-align: center; color: #6b7280;">No cars available.</p>';
+// --- FILTERING & RENDERING (Same as before) ---
+function filterCars() {
+    const searchText = document.getElementById('searchInput').value.toLowerCase();
+    const manufacturerId = document.getElementById('manufacturerSelect').value;
+
+    const filtered = allCars.filter(car => {
+        const matchesSearch = car.name.toLowerCase().includes(searchText);
+        const matchesManuf = manufacturerId === "" || car.manufacturerId == manufacturerId;
+        return matchesSearch && matchesManuf;
+    });
+    renderCars(filtered);
+}
+
+function resetFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('manufacturerSelect').value = '';
+    renderCars(allCars);
+}
+
+function renderCars(carsToDisplay) {
+    const grid = document.getElementById('car-grid');
+    grid.innerHTML = '';
+
+    if (carsToDisplay.length === 0) {
+        grid.innerHTML = '<p>No cars found.</p>';
         return;
     }
 
-    elements.carsGrid.innerHTML = cars.map(car => `
-        <div class="car-card" onclick="handleCarClick(${car.id})" style="animation-delay: ${Math.random() * 0.2}s">
-            <img src="${car.imageUrl}" alt="${car.name}" class="car-image" onerror="this.src='https://via.placeholder.com/400x200?text=Car+Image'">
-            <div class="car-info">
-                <h3 class="car-name">${car.name}</h3>
-                <p class="car-manufacturer">${car.manufacturer}</p>
-                <div class="car-details">
-                    <span class="car-category">${car.category}</span>
-                    <span class="car-year">${car.year}</span>
-                </div>
-                <div class="car-details">
-                    <span class="car-price">$${car.price.toLocaleString()}</span>
-                    <button class="btn btn-primary" onclick="event.stopPropagation(); handleCarClick(${car.id})">
-                        View Details
+    carsToDisplay.forEach(car => {
+        const card = document.createElement('div');
+        card.className = 'car-card';
+        
+        const imageSrc = car.image ? `img/${car.image}` : 'https://via.placeholder.com/300x200';
+        const isSelected = compareList.has(car.id);
+
+        card.innerHTML = `
+            <img src="${imageSrc}" alt="${car.name}" class="car-image" onclick="openCarDetails(${car.id})">
+            <div class="card-info">
+                <h3>${car.name}</h3>
+                <p><strong>Year:</strong> ${car.year}</p>
+                <div class="action-buttons">
+                    <button class="view-btn" onclick="openCarDetails(${car.id})">Details</button>
+                    <button class="compare-select-btn ${isSelected ? 'selected' : ''}" 
+                            onclick="toggleCompare(${car.id}, this)">
+                        ${isSelected ? 'Selected' : 'Compare'}
                     </button>
                 </div>
             </div>
-        </div>
-    `).join('');
+        `;
+        grid.appendChild(card);
+    });
 }
 
-/**
- * Render manufacturers grid
- */
-function renderManufacturers(manufacturers) {
-    if (!manufacturers || manufacturers.length === 0) {
-        elements.manufacturersGrid.innerHTML = '<p style="text-align: center; color: #6b7280;">No manufacturers available.</p>';
-        return;
-    }
+// --- DETAILS LOGIC (UPDATED) ---
+async function openCarDetails(id) {
+    const modal = document.getElementById('carModal');
+    const modalBody = document.getElementById('modal-body');
+    
+    modalBody.innerHTML = '<p>Loading details...</p>';
+    modal.style.display = 'flex';
 
-    elements.manufacturersGrid.innerHTML = manufacturers.map((manufacturer, index) => `
-        <div class="manufacturer-card" style="animation-delay: ${index * 0.1}s">
-            <div class="manufacturer-logo">${manufacturer.logo}</div>
-            <h3 class="manufacturer-name">${manufacturer.name}</h3>
-            <div class="manufacturer-info">
-                <p class="manufacturer-country">${manufacturer.country}</p>
-                <p>Founded: ${manufacturer.foundingYear}</p>
-            </div>
-        </div>
-    `).join('');
-}
-
-// ===========================
-// Modal Functions
-// ===========================
-
-/**
- * Handle car card click - fetches detailed data and shows modal
- * This triggers the backend's goroutine/channel processing
- */
-async function handleCarClick(carId) {
     try {
-        // Fetch detailed car data from backend
-        // This will trigger the goroutine/channel processing on the server
-        const carData = await fetchCarDetails(carId);
+        const response = await fetch(`/api/cars/${id}`);
+        const car = await response.json();
+
+        // LOOKUP LOGIC: Translate IDs to Names
+        // 1. Manufacturer
+        const manufObj = manufacturers.find(m => m.id == car.manufacturerId);
+        const manufName = manufObj ? manufObj.name : 'Unknown';
+        const manufCountry = manufObj ? manufObj.country : 'Unknown';
+        const manufYear = manufObj ? manufObj.foundingYear : 'Unknown';
+
+        // 2. Category
+        const catObj = categories.find(c => c.id == car.categoryId);
+        const categoryName = catObj ? catObj.name : 'Unknown';
+
+        const specs = car.specifications || {};
+        const imageSrc = car.image ? `img/${car.image}` : 'https://via.placeholder.com/400';
         
-        // Populate modal with car data
-        document.getElementById('modal-car-name').textContent = carData.name;
-        document.getElementById('modal-car-manufacturer').textContent = carData.manufacturer;
-        document.getElementById('modal-car-category').textContent = carData.category;
-        document.getElementById('modal-car-year').textContent = carData.year;
-        document.getElementById('modal-car-price').textContent = `$${carData.price.toLocaleString()}`;
-        document.getElementById('modal-car-image').src = carData.imageUrl;
-        document.getElementById('modal-car-image').alt = carData.name;
-        
-        // Populate technical specifications from details object
-        if (carData.details) {
-            document.getElementById('modal-car-engine').textContent = carData.details.engine || 'N/A';
-            document.getElementById('modal-car-horsepower').textContent = 
-                carData.details.horsepower ? `${carData.details.horsepower} HP` : 'N/A';
-            document.getElementById('modal-car-transmission').textContent = carData.details.transmission || 'N/A';
-            document.getElementById('modal-car-drivetrain').textContent = carData.details.drivetrain || 'N/A';
-        }
-        
-        // Show modal
-        openModal();
+        modalBody.innerHTML = `
+            <img src="${imageSrc}" class="modal-image">
+            <h2>${car.name}</h2>
+            <p class="subtitle"><strong>Category:</strong> ${categoryName}</p>
+            <hr>
+            
+            <div class="details-section">
+                <h3>Specifications</h3>
+                <div class="specs-grid">
+                    <p><strong>Engine:</strong> ${specs.engine || 'N/A'}</p>
+                    <p><strong>Horsepower:</strong> ${specs.horsepower || 'N/A'} hp</p>
+                    <p><strong>Transmission:</strong> ${specs.transmission || 'N/A'}</p>
+                    <p><strong>Drivetrain:</strong> ${specs.drivetrain || 'N/A'}</p>
+                    <p><strong>Year:</strong> ${car.year}</p>
+                </div>
+            </div>
+
+            <div class="details-section" style="margin-top: 20px; background: #f9f9f9; padding: 15px; border-radius: 5px;">
+                <h3>Manufacturer Details</h3>
+                <p><strong>Name:</strong> ${manufName}</p>
+                <p><strong>Country:</strong> ${manufCountry}</p>
+                <p><strong>Founding Year:</strong> ${manufYear}</p>
+            </div>
+        `;
     } catch (error) {
-        console.error('Failed to show car details:', error);
+        console.error(error);
+        modalBody.innerHTML = '<p style="color:red">Error loading details.</p>';
     }
 }
 
-/**
- * Open the modal
- */
-function openModal() {
-    elements.modal.classList.remove('hidden');
-    document.body.style.overflow = 'hidden'; // Prevent background scrolling
-}
-
-/**
- * Close the modal
- */
-function closeModal() {
-    elements.modal.classList.add('hidden');
-    document.body.style.overflow = ''; // Restore scrolling
-}
-
-// Close modal when clicking outside of it
-document.addEventListener('click', (e) => {
-    if (e.target === elements.modal) {
-        closeModal();
-    }
-});
-
-// Close modal with Escape key
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !elements.modal.classList.contains('hidden')) {
-        closeModal();
-    }
-});
-
-// ===========================
-// UI Helper Functions
-// ===========================
-
-/**
- * Show or hide loading indicator
- */
-function showLoading(show) {
-    if (show) {
-        elements.loading.classList.remove('hidden');
+// --- COMPARISON LOGIC (Keep as is) ---
+function toggleCompare(id, btnElement) {
+    if (compareList.has(id)) {
+        compareList.delete(id);
+        btnElement.classList.remove('selected');
+        btnElement.innerText = "Compare";
     } else {
-        elements.loading.classList.add('hidden');
+        if (compareList.size >= 3) {
+            alert("Max 3 cars.");
+            return;
+        }
+        compareList.add(id);
+        btnElement.classList.add('selected');
+        btnElement.innerText = "Selected";
     }
+    updateCompareBar();
 }
 
-/**
- * Show error message
- */
-function showError(message) {
-    elements.errorText.textContent = message;
-    elements.errorMessage.classList.remove('hidden');
+function updateCompareBar() {
+    const bar = document.getElementById('compareBar');
+    document.getElementById('compareCount').innerText = compareList.size;
+    bar.style.display = compareList.size > 0 ? 'flex' : 'none';
 }
 
-/**
- * Hide error message
- */
-function hideError() {
-    elements.errorMessage.classList.add('hidden');
+function clearComparison() {
+    compareList.clear();
+    updateCompareBar();
+    renderCars(allCars);
 }
 
-/**
- * Switch between different views (cars/manufacturers)
- */
-function switchView(view) {
-    currentView = view;
-    
-    // Update navigation buttons
-    elements.navButtons.forEach(btn => {
-        if (btn.dataset.view === view) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-    
-    // Show/hide sections
-    if (view === 'cars') {
-        elements.carsSection.classList.remove('hidden');
-        elements.manufacturersSection.classList.add('hidden');
-        
-        // Fetch cars if not already loaded
-        if (carsData.length === 0) {
-            fetchCars();
-        }
-    } else if (view === 'manufacturers') {
-        elements.carsSection.classList.add('hidden');
-        elements.manufacturersSection.classList.remove('hidden');
-        
-        // Fetch manufacturers if not already loaded
-        if (manufacturersData.length === 0) {
-            fetchManufacturers();
-        }
-    }
+async function showComparisonModal() {
+    const modal = document.getElementById('compareModal');
+    const container = document.getElementById('compare-body');
+    container.innerHTML = '<p>Loading...</p>';
+    modal.style.display = 'flex';
+
+    try {
+        const promises = Array.from(compareList).map(id => fetch(`/api/cars/${id}`).then(r => r.json()));
+        const cars = await Promise.all(promises);
+
+        let html = '<div class="comparison-table-wrapper"><table class="comparison-table"><tr><th>Feature</th>';
+        cars.forEach(c => html += `<td><img src="${c.image ? 'img/'+c.image : ''}" style="width:100px"><br>${c.name}</td>`);
+        html += '</tr>';
+
+        const rows = [
+            { label: 'Year', key: 'year' },
+            { label: 'Category', isCat: true },
+            { label: 'Engine', key: 'engine', isSpec: true },
+            { label: 'Horsepower', key: 'horsepower', isSpec: true },
+            { label: 'Transmission', key: 'transmission', isSpec: true }
+        ];
+
+        rows.forEach(row => {
+            html += `<tr><th>${row.label}</th>`;
+            cars.forEach(car => {
+                let val = 'N/A';
+                if (row.isSpec && car.specifications) val = car.specifications[row.key] || 'N/A';
+                else if (row.isCat) {
+                    const c = categories.find(cat => cat.id == car.categoryId);
+                    val = c ? c.name : 'N/A';
+                }
+                else val = car[row.key] || 'N/A';
+                html += `<td>${val}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</table></div>';
+        container.innerHTML = html;
+    } catch (e) { container.innerHTML = '<p>Error.</p>'; }
 }
 
-// ===========================
-// Event Listeners
-// ===========================
-
-// Navigation button click handlers
-elements.navButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-        switchView(btn.dataset.view);
-    });
-});
-
-// ===========================
-// Initialization
-// ===========================
-
-/**
- * Initialize the application when DOM is ready
- */
-function init() {
-    console.log('Cars Viewer Application Started');
-    console.log('API Base URL:', API_BASE_URL);
-    
-    // Load initial view (cars)
-    fetchCars();
-    
-    console.log('✅ Application initialized successfully');
+function closeCompareModal() {
+    document.getElementById('compareModal').style.display = 'none';
 }
-
-// Start the application when DOM is fully loaded
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
-}
-
-// ===========================
-// Export functions for HTML onclick handlers
-// ===========================
-window.handleCarClick = handleCarClick;
-window.closeModal = closeModal;
