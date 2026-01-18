@@ -24,87 +24,40 @@
 // 	}
 // }
 
+
+
 package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/http"
+	"viewer/internal/handlers" 
 )
 
-// Config
-const (
-	PORT         = ":8080"
-	NODE_API_URL = "http://localhost:3000"
-)
+const PORT = ":8080"
 
 func main() {
-	// 1. SERVE IMAGES (Clean URL: /img/car.jpg)
-	// We map the URL path "/img/" to the folder "./api/img"
+	// 1. Serve Images
 	imgFs := http.FileServer(http.Dir("./api/img"))
 	http.Handle("/img/", http.StripPrefix("/img/", imgFs))
 
-	// 2. SERVE WEBSITE (Clean URL: / )
-	// We map the Root URL "/" to the folder "./frontend"
+	// 2. Serve Website
 	fs := http.FileServer(http.Dir("./frontend"))
 	http.Handle("/", fs)
 
-	// 3. API PROXY ENDPOINTS
-	http.HandleFunc("/api/cars", proxyHandler("/api/models"))
-	http.HandleFunc("/api/cars/", proxyDetailHandler)
-	http.HandleFunc("/api/manufacturers", proxyHandler("/api/manufacturers"))
-	http.HandleFunc("/api/categories", proxyHandler("/api/categories"))
+	// 3. API Proxy Endpoints (Using the 'handlers' package)
+	http.HandleFunc("/api/cars", handlers.ProxyHandler("/api/models"))
+	http.HandleFunc("/api/cars/", handlers.ProxyDetailHandler)
+	http.HandleFunc("/api/manufacturers", handlers.ProxyHandler("/api/manufacturers"))
+	http.HandleFunc("/api/categories", handlers.ProxyHandler("/api/categories"))
 
-	// 4. START SERVER
+	// 4. Start Server
 	fmt.Printf("✅ Server running!\n")
-	fmt.Printf("🌎 Website: http://localhost%s\n", PORT) // Clickable link to root
+	fmt.Printf("🌎 Website: http://localhost%s\n", PORT)
 	
-	// Better error handling for port conflicts
 	err := http.ListenAndServe(PORT, nil)
 	if err != nil {
-		log.Fatal("❌ Server failed to start. Is port 8080 already in use?", err)
+		log.Fatal("❌ Server failed to start:", err)
 	}
-}
-
-// --- KEEP THE EXISTING PROXY FUNCTIONS BELOW (No changes needed there) ---
-
-func proxyHandler(targetPath string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		destUrl := NODE_API_URL + targetPath
-		resp, err := http.Get(destUrl)
-		if err != nil {
-			http.Error(w, "Failed to connect to API", http.StatusServiceUnavailable)
-			return
-		}
-		defer resp.Body.Close()
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(resp.StatusCode)
-		io.Copy(w, resp.Body)
-	}
-}
-
-func proxyDetailHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Path[len("/api/cars/"):]
-	targetUrl := fmt.Sprintf("%s/api/models/%s", NODE_API_URL, id)
-	
-	resultChan := make(chan *http.Response)
-	go func() {
-		resp, err := http.Get(targetUrl)
-		if err != nil {
-			resultChan <- nil
-			return
-		}
-		resultChan <- resp
-	}()
-
-	resp := <-resultChan
-	if resp == nil {
-		http.Error(w, "Error fetching car details", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
 }
